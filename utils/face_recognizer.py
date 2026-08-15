@@ -4,7 +4,8 @@ import shutil
 import cv2
 import numpy as np
 
-FACE_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'face_data')
+PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+FACE_DATA_DIR = os.path.join(PROJECT_ROOT, 'face_data')
 SAMPLES_DIR = os.path.join(FACE_DATA_DIR, 'samples')
 MODEL_PATH = os.path.join(FACE_DATA_DIR, 'lbph_model.yml')
 FACE_SIZE = (200, 200)
@@ -20,9 +21,12 @@ _eye_cascade_unavailable = False
 _clahe = None
 
 # Some ARM/piwheels OpenCV builds don't ship cv2.data.haarcascades with the
-# XML files present, even though the module imports fine. Search the usual
-# install locations instead of trusting that path alone.
+# XML files present, even though the module imports fine. The project ships
+# its own copy (checked first) so face detection works regardless of how any
+# given machine's OpenCV was packaged; the OpenCV/system paths are kept as a
+# fallback for environments where re-cloning isn't convenient.
 _CASCADE_SEARCH_DIRS = [
+    os.path.join(PROJECT_ROOT, 'haarcascades'),
     cv2.data.haarcascades,
     '/usr/share/opencv4/haarcascades/',
     '/usr/share/opencv/haarcascades/',
