@@ -1,0 +1,46 @@
+<!-- Overlay -->
+<div id="sidebarOverlay" onclick="toggleSidebar()" class="hidden fixed inset-0 bg-slate-900/40 z-40 md:hidden"></div>
+
+<!-- Sidebar -->
+<aside id="sidebar" class="sidebar fixed left-0 top-0 h-full w-64 bg-white border-r border-slate-100 z-50 flex flex-col shadow-sm md:translate-x-0">
+  <div class="p-6 border-b border-slate-100">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center shadow">
+        <i class="fas fa-fingerprint text-white text-lg"></i>
+      </div>
+      <div>
+        <div class="font-display font-bold text-slate-800 leading-tight">AttendX Pro</div>
+        <div class="text-xs text-slate-400">Teacher Portal</div>
+      </div>
+    </div>
+  </div>
+
+  <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2">Lectures</p>
+    <a href="/teacher/dashboard" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 text-sm font-medium {% if active == 'dashboard' %}active{% endif %}">
+      <i class="fas fa-th-large w-4 text-center"></i> Dashboard
+    </a>
+    <a href="/teacher/lectures/history" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 text-sm font-medium {% if active == 'history' %}active{% endif %}">
+      <i class="fas fa-history w-4 text-center"></i> Lecture History
+    </a>
+    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 mt-4 mb-2">Students</p>
+    <a href="/teacher/students/enroll" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 text-sm font-medium {% if active == 'enroll' %}active{% endif %}">
+      <i class="fas fa-user-plus w-4 text-center"></i> Enroll Students
+    </a>
+  </nav>
+
+  <div class="p-4 border-t border-slate-100">
+    <div class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-50">
+      <div class="w-8 h-8 rounded-full gradient-bg flex items-center justify-center text-white text-sm font-bold">
+        {{ teacher.name[0] if teacher else 'T' }}
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-semibold text-slate-700 truncate">{{ teacher.name if teacher else 'Teacher' }}</div>
+        <div class="text-xs text-slate-400 truncate">{{ teacher.dept.name if teacher and teacher.dept else 'Department' }}</div>
+      </div>
+      <a href="/logout" class="text-slate-400 hover:text-red-500 transition-colors">
+        <i class="fas fa-sign-out-alt text-sm"></i>
+      </a>
+    </div>
+  </div>
+</aside>

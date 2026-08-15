@@ -1,0 +1,67 @@
+<!-- Overlay for mobile -->
+<div id="sidebarOverlay" onclick="toggleSidebar()" class="hidden fixed inset-0 bg-slate-900/40 z-40 md:hidden"></div>
+
+<!-- Sidebar -->
+<aside id="sidebar" class="sidebar fixed left-0 top-0 h-full w-64 bg-white border-r border-slate-100 z-50 flex flex-col shadow-sm md:translate-x-0">
+  <!-- Brand -->
+  <div class="p-6 border-b border-slate-100">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center shadow">
+        <i class="fas fa-fingerprint text-white text-lg"></i>
+      </div>
+      <div>
+        <div class="font-display font-bold text-slate-800 leading-tight">AttendX Pro</div>
+        <div class="text-xs text-slate-400">Admin Panel</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nav -->
+  <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2">Main</p>
+    <a href="/admin/dashboard" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 text-sm font-medium {% if active == 'dashboard' %}active{% endif %}">
+      <i class="fas fa-th-large w-4 text-center"></i> Dashboard
+    </a>
+    <a href="/admin/teachers" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 text-sm font-medium {% if active == 'teachers' %}active{% endif %}">
+      <i class="fas fa-chalkboard-teacher w-4 text-center"></i> Teachers
+    </a>
+    <a href="/admin/students" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 text-sm font-medium {% if active == 'students' %}active{% endif %}">
+      <i class="fas fa-user-graduate w-4 text-center"></i> Students
+    </a>
+    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 mt-4 mb-2">System</p>
+    <a href="/fingerprint/status" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 text-sm font-medium" onclick="checkSensorStatus(event)">
+      <i class="fas fa-microchip w-4 text-center"></i> Sensor Status
+    </a>
+  </nav>
+
+  <!-- User -->
+  <div class="p-4 border-t border-slate-100">
+    <div class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-50">
+      <div class="w-8 h-8 rounded-full gradient-bg flex items-center justify-center text-white text-sm font-bold">A</div>
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-semibold text-slate-700 truncate">Administrator</div>
+        <div class="text-xs text-slate-400">Super Admin</div>
+      </div>
+      <a href="/logout" class="text-slate-400 hover:text-red-500 transition-colors" title="Logout">
+        <i class="fas fa-sign-out-alt text-sm"></i>
+      </a>
+    </div>
+  </div>
+</aside>
+
+<script>
+async function checkSensorStatus(e) {
+  e.preventDefault();
+  try {
+    const res = await fetch('/fingerprint/status');
+    const data = await res.json();
+    if (data.available) {
+      showToast(`Sensor online – ${data.templates}/${data.capacity} templates`, 'success');
+    } else {
+      showToast('Sensor offline: ' + (data.message || 'Not connected'), 'error');
+    }
+  } catch(err) {
+    showToast('Could not reach sensor', 'error');
+  }
+}
+</script>

@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}Lecture History - AttendX Pro{% endblock %}
+
+{% block body %}
+<div class="flex min-h-screen">
+  {% set active = 'history' %}
+  {% include 'teacher/sidebar.html' %}
+
+  <main class="main-content flex-1 md:ml-64 flex flex-col">
+    <header class="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
+      <div class="flex items-center gap-4">
+        <button onclick="toggleSidebar()" class="md:hidden text-slate-500"><i class="fas fa-bars text-xl"></i></button>
+        <div>
+          <h1 class="font-display font-bold text-slate-800 text-lg">Lecture History</h1>
+          <p class="text-xs text-slate-400">{{ teacher.name }} - {{ teacher.dept.name if teacher.dept else 'Department' }}</p>
+        </div>
+      </div>
+      <a href="/teacher/dashboard" class="btn-primary text-white text-sm px-4 py-2.5 rounded-xl font-semibold flex items-center gap-2">
+        <i class="fas fa-plus"></i> <span class="hidden sm:inline">New Lecture</span>
+      </a>
+    </header>
+
+    <div class="p-6 space-y-5">
+      {% set completed_count = lectures|selectattr('status', 'equalto', 'completed')|list|length %}
+      {% set active_count = lectures|selectattr('status', 'equalto', 'active')|list|length %}
+      {% set pending_count = lectures|selectattr('status', 'equalto', 'pending')|list|length %}
+
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="stat-card">
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center"><i class="fas fa-chalkboard text-primary-600"></i></div>
+            <span class="badge badge-blue">All</span>
+          </div>
+          <div class="text-3xl font-display font-bold text-slate-800">{{ lectures|length }}</div>
+          <div class="text-sm text-slate-500 mt-1">Lectures</div>
+        </div>
+        <div class="stat-card">
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center"><i class="fas fa-check text-green-600"></i></div>
+            <span class="badge badge-green">Done</span>
+          </div>
+          <div class="text-3xl font-display font-bold text-slate-800">{{ completed_count }}</div>
+          <div class="text-sm text-slate-500 mt-1">Completed</div>
+        </div>
+        <div class="stat-card">
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center"><i class="fas fa-play text-orange-500"></i></div>
+            <span class="badge badge-yellow">Live</span>
+          </div>
+          <div class="text-3xl font-display font-bold text-slate-800">{{ active_count }}</div>
+          <div class="text-sm text-slate-500 mt-1">Active</div>
+        </div>
+        <div class="stat-card">
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center"><i class="fas fa-clock text-slate-500"></i></div>
+            <span class="badge badge-gray">Draft</span>
+          </div>
+          <div class="text-3xl font-display font-bold text-slate-800">{{ pending_count }}</div>
+          <div class="text-sm text-slate-500 mt-1">Pending</div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-wrap gap-3 items-center">
+        <div class="flex items-center gap-2 flex-1 min-w-56">
+          <i class="fas fa-search text-slate-400"></i>
+          <input id="searchInput" onkeyup="filterHistory()" type="text" placeholder="Search subject, department, year..."
+            class="flex-1 text-sm outline-none text-slate-700 placeholder-slate-400">
+        </div>
+        <select id="statusFilter" onchange="filterHistory()" class="border border-slate-200 rounded-lg text-sm px-3 py-2 text-slate-600 outline-none bg-white">
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="completed">Completed</option>
+          <option value="pending">Pending</option>
+        </select>
+        <span id="countBadge" class="badge badge-blue">{{ lectures|length }} records</span>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-100">
+                <th class="text-left px-5 py-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Lecture</th>
+                <th class="text-left px-5 py-4 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden md:table-cell">Class</th>
+                <th class="text-left px-5 py-4 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden lg:table-cell">Time</th>
+                <th class="text-left px-5 py-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Attendance</th>
+                <th class="text-left px-5 py-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Status</th>
+                <th class="text-left px-5 py-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="historyTable">
+              {% for lecture in lectures %}
+              <tr class="table-row-hover border-b border-slate-50"
+                  data-status="{{ lecture.status }}"
+                  data-search="{{ lecture.subject }} {{ lecture.department }} {{ lecture.department_code }} {{ lecture.year }} {{ lecture.lecture_date }}">
+                <td class="px-5 py-4">
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl {% if lecture.status == 'active' %}gradient-bg{% elif lecture.status == 'completed' %}bg-green-500{% else %}bg-slate-300{% endif %} flex items-center justify-center shrink-0">
+                      <i class="fas fa-{% if lecture.status == 'active' %}play{% elif lecture.status == 'completed' %}check{% else %}clock{% endif %} text-white text-sm"></i>
+                    </div>
+                    <div>
+                      <div class="font-semibold text-slate-800">{{ lecture.subject }}</div>
+                      <div class="text-xs text-slate-400">{{ lecture.lecture_date }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-5 py-4 hidden md:table-cell">
+                  <span class="badge badge-blue">{{ lecture.department_code or lecture.department }}</span>
+                  <span class="badge badge-gray ml-1">Year {{ lecture.year }}</span>
+                </td>
+                <td class="px-5 py-4 hidden lg:table-cell text-slate-500">{{ lecture.start_time }} - {{ lecture.end_time }}</td>
+                <td class="px-5 py-4">
+                  <div class="min-w-32">
+                    <div class="flex items-center justify-between text-xs mb-1">
+                      <span class="font-semibold text-slate-700">{{ lecture.present_count }}/{{ lecture.expected_students }}</span>
+                      <span class="text-slate-400">{{ lecture.attendance_rate }}%</span>
+                    </div>
+                    <div class="h-2 rounded-full bg-slate-100 overflow-hidden">
+                      <div class="h-full bg-green-500 rounded-full" style="width: {{ lecture.attendance_rate }}%"></div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-5 py-4">
+                  <span class="badge {% if lecture.status == 'active' %}badge-blue{% elif lecture.status == 'completed' %}badge-green{% else %}badge-gray{% endif %}">
+                    {{ lecture.status.title() }}
+                  </span>
+                </td>
+                <td class="px-5 py-4">
+                  <div class="flex items-center gap-2">
+                    <button onclick="openAttendance({{ lecture.id }})" class="w-8 h-8 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 flex items-center justify-center transition-colors" title="View Attendance">
+                      <i class="fas fa-eye text-sm"></i>
+                    </button>
+                    {% if lecture.excel_path %}
+                    <a href="/attendance_records/{{ lecture.excel_path }}" class="w-8 h-8 rounded-lg bg-green-50 hover:bg-green-100 text-green-600 flex items-center justify-center transition-colors" title="Download Excel">
+                      <i class="fas fa-file-excel text-sm"></i>
+                    </a>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="6" class="px-5 py-16 text-center text-slate-400">
+                  <i class="fas fa-history text-4xl mb-3 block opacity-30"></i>
+                  No lecture history yet.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="attendanceModal" class="modal-overlay hidden">
+  <div class="modal-box p-0 max-w-3xl">
+    <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+      <div>
+        <h3 id="modalTitle" class="font-display font-bold text-xl text-slate-800">Attendance</h3>
+        <p id="modalMeta" class="text-xs text-slate-400 mt-1"></p>
+      </div>
+      <button onclick="closeModal('attendanceModal')" class="text-slate-400 hover:text-slate-600 text-xl"><i class="fas fa-times"></i></button>
+    </div>
+    <div id="attendanceRows" class="max-h-[60vh] overflow-y-auto p-4"></div>
+  </div>
+</div>
+
+<script>
+function filterHistory() {
+  const query = document.getElementById('searchInput').value.toLowerCase();
+  const status = document.getElementById('statusFilter').value;
+  const rows = document.querySelectorAll('#historyTable tr[data-search]');
+  let visible = 0;
+  rows.forEach(row => {
+    const matchesText = row.dataset.search.toLowerCase().includes(query);
+    const matchesStatus = !status || row.dataset.status === status;
+    const show = matchesText && matchesStatus;
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  document.getElementById('countBadge').textContent = `${visible} records`;
+}
+
+async function openAttendance(lectureId) {
+  openModal('attendanceModal');
+  document.getElementById('attendanceRows').innerHTML = '<div class="py-10 text-center text-slate-400"><i class="fas fa-circle-notch fa-spin text-2xl mb-3 block"></i>Loading attendance...</div>';
+  const res = await apiCall(`/teacher/lectures/${lectureId}/attendance`);
+  document.getElementById('modalTitle').textContent = res.lecture.subject;
+  document.getElementById('modalMeta').textContent = `${res.lecture.lecture_date} | ${res.lecture.start_time} - ${res.lecture.end_time}`;
+
+  if (!res.attendance || res.attendance.length === 0) {
+    document.getElementById('attendanceRows').innerHTML = '<div class="py-10 text-center text-slate-400"><i class="fas fa-user-clock text-4xl mb-3 block opacity-30"></i>No student scans recorded for this lecture.</div>';
+    return;
+  }
+
+  document.getElementById('attendanceRows').innerHTML = `
+    <div class="divide-y divide-slate-100">
+      ${res.attendance.map(record => `
+        <div class="py-3 px-2 flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-9 h-9 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700 font-bold shrink-0">${record.student_name.charAt(0)}</div>
+            <div class="min-w-0">
+              <div class="font-semibold text-slate-800 truncate">${record.student_name}</div>
+              <div class="text-xs text-slate-400">${record.student_prn}</div>
+            </div>
+          </div>
+          <div class="text-right shrink-0">
+            <span class="badge badge-green">${record.status}</span>
+            <div class="text-xs text-slate-400 mt-1">IN ${record.in_time || '--'}</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>`;
+}
+</script>
+{% endblock %}

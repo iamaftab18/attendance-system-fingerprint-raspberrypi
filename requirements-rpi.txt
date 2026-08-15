@@ -1,0 +1,4 @@
+pyfingerprint
+pyserial
+opencv-contrib-python
+numpy

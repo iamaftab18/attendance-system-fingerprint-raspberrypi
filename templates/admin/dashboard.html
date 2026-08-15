@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard – AttendX Pro{% endblock %}
+
+{% block body %}
+<div class="flex min-h-screen">
+  {% set active = 'dashboard' %}
+  {% include 'admin/sidebar.html' %}
+
+  <!-- Main -->
+  <main class="main-content flex-1 md:ml-64 flex flex-col">
+
+    <!-- Topbar -->
+    <header class="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
+      <div class="flex items-center gap-4">
+        <button onclick="toggleSidebar()" class="md:hidden text-slate-500 hover:text-slate-700">
+          <i class="fas fa-bars text-xl"></i>
+        </button>
+        <div>
+          <h1 class="font-display font-bold text-slate-800 text-lg">Dashboard</h1>
+          <p class="text-xs text-slate-400">Welcome back, {{ admin_name }}</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div id="sensorBadge" class="badge badge-gray">
+          <i class="fas fa-circle text-[8px]"></i> Checking...
+        </div>
+        <span class="text-sm text-slate-500" id="currentTime"></span>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <div class="flex-1 p-6 space-y-6">
+
+      <!-- Stats row -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="stat-card card-hover">
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+              <i class="fas fa-chalkboard-teacher text-primary-600 text-lg"></i>
+            </div>
+            <span class="badge badge-blue">Total</span>
+          </div>
+          <div class="text-3xl font-display font-bold text-slate-800">{{ teacher_count }}</div>
+          <div class="text-sm text-slate-500 mt-1">Teachers</div>
+        </div>
+
+        <div class="stat-card card-hover">
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+              <i class="fas fa-user-graduate text-green-600 text-lg"></i>
+            </div>
+            <span class="badge badge-green">Total</span>
+          </div>
+          <div class="text-3xl font-display font-bold text-slate-800">{{ student_count }}</div>
+          <div class="text-sm text-slate-500 mt-1">Students</div>
+        </div>
+
+        <div class="stat-card card-hover">
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+              <i class="fas fa-building text-purple-600 text-lg"></i>
+            </div>
+            <span class="badge" style="background:#ede9fe;color:#5b21b6">Depts</span>
+          </div>
+          <div class="text-3xl font-display font-bold text-slate-800">{{ departments|length }}</div>
+          <div class="text-sm text-slate-500 mt-1">Departments</div>
+        </div>
+
+        <div class="stat-card card-hover" onclick="checkSensorStatus(event)" style="cursor:pointer">
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+              <i class="fas fa-fingerprint text-orange-500 text-lg"></i>
+            </div>
+            <span class="badge badge-gray" id="sensorStatBadge">Check</span>
+          </div>
+          <div class="text-3xl font-display font-bold text-slate-800" id="sensorTemplateCount">–</div>
+          <div class="text-sm text-slate-500 mt-1">FP Templates</div>
+        </div>
+      </div>
+
+      <!-- Quick actions -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- Departments -->
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div class="p-5 border-b border-slate-50 flex items-center justify-between">
+            <h2 class="font-display font-bold text-slate-800">Departments</h2>
+            <button onclick="openModal('addDeptModal')" class="btn-primary text-white text-xs px-3 py-1.5 rounded-lg font-semibold">
+              <i class="fas fa-plus mr-1"></i> Add
+            </button>
+          </div>
+          <div class="p-5">
+            <div class="space-y-2">
+              {% for dept in departments %}
+              <div class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-50 transition-colors">
+                <div class="flex items-center gap-3">
+                  <div class="w-7 h-7 rounded-lg bg-primary-100 flex items-center justify-center">
+                    <span class="text-primary-700 text-xs font-bold">{{ dept.code[:2] }}</span>
+                  </div>
+                  <span class="text-sm font-medium text-slate-700">{{ dept.name }}</span>
+                </div>
+                <span class="badge badge-blue">{{ dept.code }}</span>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Links -->
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-3">
+          <h2 class="font-display font-bold text-slate-800 mb-4">Quick Actions</h2>
+
+          <a href="/admin/teachers" class="flex items-center gap-4 p-4 rounded-xl bg-blue-50 border border-blue-100 hover:border-blue-300 card-hover group">
+            <div class="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center shadow">
+              <i class="fas fa-chalkboard-teacher text-white"></i>
+            </div>
+            <div class="flex-1">
+              <div class="font-semibold text-slate-800 text-sm">Manage Teachers</div>
+              <div class="text-xs text-slate-500">Add, edit, enroll fingerprints</div>
+            </div>
+            <i class="fas fa-arrow-right text-slate-300 group-hover:text-primary-500 transition-colors"></i>
+          </a>
+
+          <a href="/admin/students" class="flex items-center gap-4 p-4 rounded-xl bg-green-50 border border-green-100 hover:border-green-300 card-hover group">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center shadow">
+              <i class="fas fa-user-graduate text-white"></i>
+            </div>
+            <div class="flex-1">
+              <div class="font-semibold text-slate-800 text-sm">Manage Students</div>
+              <div class="text-xs text-slate-500">Add, edit, enroll fingerprints</div>
+            </div>
+            <i class="fas fa-arrow-right text-slate-300 group-hover:text-green-500 transition-colors"></i>
+          </a>
+
+          <div onclick="checkSensorStatus(event)" class="flex items-center gap-4 p-4 rounded-xl bg-orange-50 border border-orange-100 hover:border-orange-300 card-hover group cursor-pointer">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center shadow">
+              <i class="fas fa-microchip text-white"></i>
+            </div>
+            <div class="flex-1">
+              <div class="font-semibold text-slate-800 text-sm">Sensor Status</div>
+              <div class="text-xs text-slate-500">Check R307s fingerprint sensor</div>
+            </div>
+            <i class="fas fa-refresh text-slate-300 group-hover:text-orange-500 transition-colors"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Add Department Modal -->
+<div id="addDeptModal" class="modal-overlay hidden">
+  <div class="modal-box p-8">
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="font-display font-bold text-xl text-slate-800">Add Department</h3>
+      <button onclick="closeModal('addDeptModal')" class="text-slate-400 hover:text-slate-600 text-xl"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Department Name</label>
+        <input id="deptName" type="text" placeholder="e.g. Computer Engineering" class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400">
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Department Code</label>
+        <input id="deptCode" type="text" placeholder="e.g. CE" maxlength="10" class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400">
+      </div>
+      <button onclick="addDepartment()" class="btn-primary w-full py-3 rounded-xl text-white font-semibold text-sm">
+        <i class="fas fa-plus mr-2"></i> Add Department
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Clock
+function updateClock() {
+  const now = new Date();
+  document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+}
+setInterval(updateClock, 1000); updateClock();
+
+// Sensor check on load
+window.addEventListener('load', async () => {
+  try {
+    const res = await fetch('/fingerprint/status');
+    const d = await res.json();
+    const badge = document.getElementById('sensorBadge');
+    const statBadge = document.getElementById('sensorStatBadge');
+    if (d.available) {
+      badge.className = 'badge badge-green'; badge.innerHTML = '<i class="fas fa-circle text-[8px]"></i> Sensor Online';
+      statBadge.className = 'badge badge-green'; statBadge.textContent = 'Online';
+      document.getElementById('sensorTemplateCount').textContent = d.templates;
+    } else {
+      badge.className = 'badge badge-red'; badge.innerHTML = '<i class="fas fa-circle text-[8px]"></i> Sensor Offline';
+      statBadge.className = 'badge badge-red'; statBadge.textContent = 'Offline';
+      document.getElementById('sensorTemplateCount').textContent = '0';
+    }
+  } catch(e) {}
+});
+
+async function addDepartment() {
+  const name = document.getElementById('deptName').value.trim();
+  const code = document.getElementById('deptCode').value.trim();
+  if (!name || !code) { showToast('Fill all fields', 'error'); return; }
+  const res = await apiCall('/admin/departments/add', 'POST', { name, code });
+  if (res.success) { showToast('Department added!', 'success'); closeModal('addDeptModal'); setTimeout(() => location.reload(), 1000); }
+  else showToast(res.message, 'error');
+}
+</script>
+{% endblock %}
