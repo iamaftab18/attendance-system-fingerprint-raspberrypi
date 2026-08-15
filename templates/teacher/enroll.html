@@ -289,6 +289,12 @@ function closeFaceEnrollModal() {
   closeModal('faceEnrollModal');
 }
 
+// Navigating away (Logout, sidebar links, closing the tab) while the preview
+// is still streaming must not leave the camera held open server-side - stop
+// it proactively instead of relying on the browser to abort the request.
+window.addEventListener('pagehide', stopFacePreview);
+window.addEventListener('beforeunload', stopFacePreview);
+
 async function startFaceEnrollment() {
   document.getElementById('faceStartBtn').disabled = true;
   document.getElementById('faceScannerBox').className = `${FACE_BOX_BASE} scanning`;

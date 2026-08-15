@@ -75,6 +75,14 @@ def _grab_camera_frames(count, delay=0.25):
         camera_manager.release()
 
 
+# Upper bound on a single preview connection, regardless of whether the
+# browser side ever notices it should stop. A client navigating away (e.g.
+# clicking Logout while the enroll modal is still open) is expected to abort
+# the request promptly, but that isn't guaranteed on every network stack -
+# this cutoff guarantees the camera gets released even if it doesn't.
+MAX_PREVIEW_STREAM_SECONDS = 180
+
+
 @fp_bp.route('/camera/preview')
 def camera_preview():
     """MJPEG live preview so a student/teacher can frame themselves before
@@ -86,8 +94,9 @@ def camera_preview():
     def generate():
         if not camera_manager.acquire():
             return
+        started_at = time.monotonic()
         try:
-            while True:
+            while time.monotonic() - started_at < MAX_PREVIEW_STREAM_SECONDS:
                 frame = camera_manager.read_frame()
                 if frame is not None:
                     ok, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
@@ -99,6 +108,16 @@ def camera_preview():
             camera_manager.release()
 
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
+@fp_bp.route('/camera/reset', methods=['POST'])
+def camera_reset():
+    """Manual recovery hatch: force-drop the shared camera handle if it ever
+    gets stuck (e.g. a leaked preview connection). Safe to call any time -
+    the next capture/preview will just reopen the device.
+    """
+    camera_manager.force_reset()
+    return jsonify({'success': True, 'message': 'Camera handle reset. Try again.'})
 
 
 def _save_evidence_frame(frame, context_label):
