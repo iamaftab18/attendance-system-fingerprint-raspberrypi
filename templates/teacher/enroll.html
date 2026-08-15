@@ -214,19 +214,20 @@
 
 <div id="faceEnrollModal" class="modal-overlay hidden">
   <div class="modal-box p-8 text-center">
-    <button onclick="closeModal('faceEnrollModal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl"><i class="fas fa-times"></i></button>
+    <button onclick="closeFaceEnrollModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl"><i class="fas fa-times"></i></button>
     <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow">
       <i class="fas fa-camera text-white text-2xl"></i>
     </div>
     <h3 class="font-display font-bold text-xl text-slate-800 mb-1">Face Enrollment</h3>
-    <p class="text-slate-500 text-sm mb-6">Enrolling: <strong id="faceEntityName" class="text-purple-700"></strong></p>
-    <div class="fp-scanner mx-auto mb-6 w-48 h-48 flex flex-col items-center justify-center gap-3" id="faceScannerBox">
+    <p class="text-slate-500 text-sm mb-4">Enrolling: <strong id="faceEntityName" class="text-purple-700"></strong></p>
+    <div class="fp-scanner mx-auto mb-4 w-72 h-56 flex items-center justify-center overflow-hidden relative" id="faceScannerBox">
+      <img id="faceCameraFeed" class="hidden w-full h-full object-cover rounded-xl" alt="Live camera preview">
       <i class="fas fa-camera text-5xl text-primary-300" id="faceIcon"></i>
-      <p class="text-sm font-medium text-primary-600" id="faceStatus">Ready to enroll</p>
-      <p class="text-xs text-slate-400" id="faceSubStatus">Sit facing the webcam, then press Start</p>
     </div>
+    <p class="text-sm font-medium text-primary-600" id="faceStatus">Ready to enroll</p>
+    <p class="text-xs text-slate-400 mb-6" id="faceSubStatus">Sit facing the webcam, then press Start</p>
     <div class="flex gap-3">
-      <button onclick="closeModal('faceEnrollModal')" class="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold">Cancel</button>
+      <button onclick="closeFaceEnrollModal()" class="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold">Cancel</button>
       <button id="faceStartBtn" onclick="startFaceEnrollment()" class="flex-1 btn-success py-3 rounded-xl text-white text-sm font-semibold">Start Enrollment</button>
     </div>
   </div>
@@ -242,36 +243,71 @@ function studentName(id) {
   return student ? student.name : '';
 }
 
+const FACE_BOX_BASE = 'fp-scanner mx-auto mb-4 w-72 h-56 flex items-center justify-center overflow-hidden relative';
+
 function openFaceEnrollModal(id) {
   faceEnrollStudentId = id;
   document.getElementById('faceEntityName').textContent = studentName(id);
-  document.getElementById('faceScannerBox').className = 'fp-scanner mx-auto mb-6 w-48 h-48 flex flex-col items-center justify-center gap-3';
+  document.getElementById('faceScannerBox').className = FACE_BOX_BASE;
   document.getElementById('faceIcon').className = 'fas fa-camera text-5xl text-primary-300';
-  document.getElementById('faceStatus').textContent = 'Ready to enroll';
-  document.getElementById('faceSubStatus').textContent = 'Sit facing the webcam, then press Start';
+  document.getElementById('faceStatus').textContent = 'Loading camera preview...';
+  document.getElementById('faceSubStatus').textContent = 'Position your face in the frame';
   document.getElementById('faceStartBtn').disabled = false;
   document.getElementById('faceStartBtn').textContent = 'Start Enrollment';
   openModal('faceEnrollModal');
+  startFacePreview();
+}
+
+function startFacePreview() {
+  const img = document.getElementById('faceCameraFeed');
+  const icon = document.getElementById('faceIcon');
+  img.onload = () => {
+    icon.classList.add('hidden');
+    img.classList.remove('hidden');
+    document.getElementById('faceStatus').textContent = 'Ready to enroll';
+  };
+  img.onerror = () => {
+    img.classList.add('hidden');
+    icon.classList.remove('hidden');
+    document.getElementById('faceStatus').textContent = 'Camera preview unavailable';
+    document.getElementById('faceSubStatus').textContent = 'You can still try Start Enrollment';
+  };
+  img.src = `/fingerprint/camera/preview?ts=${Date.now()}`;
+}
+
+function stopFacePreview() {
+  const img = document.getElementById('faceCameraFeed');
+  img.onload = null;
+  img.onerror = null;
+  img.src = '';
+  img.classList.add('hidden');
+  document.getElementById('faceIcon').classList.remove('hidden');
+}
+
+function closeFaceEnrollModal() {
+  stopFacePreview();
+  closeModal('faceEnrollModal');
 }
 
 async function startFaceEnrollment() {
   document.getElementById('faceStartBtn').disabled = true;
-  document.getElementById('faceScannerBox').className = 'fp-scanner scanning mx-auto mb-6 w-48 h-48 flex flex-col items-center justify-center gap-3';
-  document.getElementById('faceIcon').className = 'fas fa-camera text-5xl text-primary-500 animate-pulse';
+  document.getElementById('faceScannerBox').className = `${FACE_BOX_BASE} scanning`;
   document.getElementById('faceStatus').textContent = 'Capturing...';
-  document.getElementById('faceSubStatus').textContent = 'Hold still and look at the camera';
+  document.getElementById('faceSubStatus').textContent = 'Hold still and keep looking at the camera';
 
+  // Preview keeps streaming during capture - both share the same camera handle.
   const res = await apiCall('/fingerprint/face/enroll', 'POST', { id: faceEnrollStudentId });
+  stopFacePreview();
 
   if (res.success) {
-    document.getElementById('faceScannerBox').className = 'fp-scanner success mx-auto mb-6 w-48 h-48 flex flex-col items-center justify-center gap-3';
+    document.getElementById('faceScannerBox').className = `${FACE_BOX_BASE} success`;
     document.getElementById('faceIcon').className = 'fas fa-check-circle text-5xl text-green-500';
     document.getElementById('faceStatus').textContent = 'Enrolled';
     document.getElementById('faceSubStatus').textContent = res.message;
     showToast('Face enrolled successfully', 'success');
     setTimeout(() => location.reload(), 1500);
   } else {
-    document.getElementById('faceScannerBox').className = 'fp-scanner error mx-auto mb-6 w-48 h-48 flex flex-col items-center justify-center gap-3';
+    document.getElementById('faceScannerBox').className = `${FACE_BOX_BASE} error`;
     document.getElementById('faceIcon').className = 'fas fa-times-circle text-5xl text-red-500';
     document.getElementById('faceStatus').textContent = 'Failed';
     document.getElementById('faceSubStatus').textContent = res.message;

@@ -1,9 +1,10 @@
-from flask import Blueprint, request, jsonify, session, current_app
+from flask import Blueprint, request, jsonify, session, current_app, Response
 from extensions import db
 from models import Teacher, Student, Lecture, AttendanceRecord
 from datetime import datetime
 from routes.teacher_routes import _lecture_can_accept_attendance
 from utils.r307s_sensor import connect_r307s
+from utils.camera import camera_manager
 import os
 import time
 
@@ -40,69 +41,64 @@ def get_sensor():
     return None
 
 
-def _camera_indices_to_try():
-    """CAMERA_INDEX lets a device pin the exact /dev/videoN it wants (mirrors
-    FINGERPRINT_PORT for the sensor). Otherwise probe the first few indices,
-    since USB webcams don't always land on 0.
-    """
-    override = os.environ.get('CAMERA_INDEX')
-    if override is not None:
-        try:
-            return [int(override)]
-        except ValueError:
-            print(f'[Camera] Ignoring invalid CAMERA_INDEX={override!r}')
-    return [0, 1, 2]
-
-
-def _open_camera():
-    import sys
-    import cv2
-
-    # Pin the V4L2 backend on Linux instead of letting OpenCV probe every
-    # backend it was built with (GStreamer, Orbsensor, ...) per index - that
-    # probing is what produces the wall of "Not a video capture device" spam.
-    backend = cv2.CAP_V4L2 if sys.platform.startswith('linux') else cv2.CAP_ANY
-    tried = _camera_indices_to_try()
-    for index in tried:
-        cap = cv2.VideoCapture(index, backend)
-        if cap.isOpened():
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-            return cap
-        cap.release()
-
-    print(f'[Camera] Unable to open camera for capture. Tried index(es) {tried}. '
-          f'Run `ls /dev/video*` to confirm a device exists, or set CAMERA_INDEX '
-          f'to the right one.')
-    return None
-
-
 def _grab_camera_frame():
-    """Open the webcam, grab a single frame, and release it."""
-    cap = _open_camera()
-    if cap is None:
+    """Grab a single frame from the shared camera."""
+    if not camera_manager.acquire():
         return None
-    ret, frame = cap.read()
-    cap.release()
-    if not ret or frame is None:
-        print('[Camera] Failed to read frame from camera.')
-        return None
-    return frame
+    try:
+        frame = camera_manager.read_frame()
+        if frame is None:
+            print('[Camera] Failed to read frame from camera.')
+        return frame
+    finally:
+        camera_manager.release()
 
 
 def _grab_camera_frames(count, delay=0.25):
-    """Open the webcam once and grab several frames, e.g. for face enrollment."""
-    cap = _open_camera()
-    if cap is None:
+    """Grab several frames from the shared camera, e.g. for face enrollment.
+
+    Uses the same reference-counted handle as the live preview stream, so
+    enrollment capture can run while a preview is still connected instead of
+    fighting it for exclusive access to the device.
+    """
+    if not camera_manager.acquire():
         return []
-    frames = []
-    for _ in range(count):
-        ret, frame = cap.read()
-        if ret and frame is not None:
-            frames.append(frame)
-        time.sleep(delay)
-    cap.release()
-    return frames
+    try:
+        frames = []
+        for _ in range(count):
+            frame = camera_manager.read_frame()
+            if frame is not None:
+                frames.append(frame)
+            time.sleep(delay)
+        return frames
+    finally:
+        camera_manager.release()
+
+
+@fp_bp.route('/camera/preview')
+def camera_preview():
+    """MJPEG live preview so a student/teacher can frame themselves before
+    (and during) face capture. Shares the camera with capture via camera_manager
+    instead of taking exclusive ownership of it.
+    """
+    import cv2
+
+    def generate():
+        if not camera_manager.acquire():
+            return
+        try:
+            while True:
+                frame = camera_manager.read_frame()
+                if frame is not None:
+                    ok, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                    if ok:
+                        yield (b'--frame\r\n'
+                               b'Content-Type: image/jpeg\r\n\r\n' + buf.tobytes() + b'\r\n')
+                time.sleep(0.08)
+        finally:
+            camera_manager.release()
+
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 def _save_evidence_frame(frame, context_label):

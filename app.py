@@ -54,4 +54,7 @@ if __name__ == '__main__':
     with app.app_context():
         create_tables()
 
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # threaded=True is required: the camera preview endpoint holds a long-lived
+    # streaming connection open, and without it that would block every other
+    # request (dashboard polling, fingerprint scans, ...) on the dev server.
+    app.run(host='0.0.0.0', port=5000, debug=True, threaded=True)
