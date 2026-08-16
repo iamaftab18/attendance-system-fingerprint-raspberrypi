@@ -489,6 +489,48 @@ def _record_attendance(student, lecture, mode, simulated=False, via_face=False):
 
 
 
+@fp_bp.route('/clear-all', methods=['POST'])
+def clear_all_fingerprints():
+    """Wipe every enrolled fingerprint: erase the sensor's onboard template
+    library and reset fingerprint_id/fingerprint_enrolled for every student
+    and teacher. Admin only.
+    """
+    if 'user_id' not in session or session.get('role') != 'admin':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 403
+
+    sensor = get_sensor()
+    sensor_cleared = False
+    sensor_message = None
+    if sensor:
+        try:
+            sensor.clearDatabase()
+            sensor_cleared = True
+        except Exception as e:
+            sensor_message = f'Sensor connected but could not be cleared: {e}'
+
+    students_updated = Student.query.filter(Student.fingerprint_enrolled == True).update(
+        {'fingerprint_id': None, 'fingerprint_enrolled': False}
+    )
+    teachers_updated = Teacher.query.filter(Teacher.fingerprint_enrolled == True).update(
+        {'fingerprint_id': None, 'fingerprint_enrolled': False}
+    )
+    db.session.commit()
+
+    if sensor and not sensor_cleared:
+        message = sensor_message
+    elif sensor_cleared:
+        message = f'Sensor wiped and {students_updated + teachers_updated} enrollment record(s) reset.'
+    else:
+        message = f'Sensor not connected; reset {students_updated + teachers_updated} enrollment record(s) in the database only.'
+
+    return jsonify({
+        'success': not (sensor and not sensor_cleared),
+        'message': message,
+        'sensor_cleared': sensor_cleared,
+        'records_reset': students_updated + teachers_updated
+    })
+
+
 @fp_bp.route('/status')
 def sensor_status():
     sensor = get_sensor()

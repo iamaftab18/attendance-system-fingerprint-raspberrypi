@@ -142,6 +142,17 @@
             </div>
             <i class="fas fa-refresh text-slate-300 group-hover:text-orange-500 transition-colors"></i>
           </div>
+
+          <div onclick="clearAllFingerprints()" class="flex items-center gap-4 p-4 rounded-xl bg-red-50 border border-red-100 hover:border-red-300 card-hover group cursor-pointer">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow">
+              <i class="fas fa-trash text-white"></i>
+            </div>
+            <div class="flex-1">
+              <div class="font-semibold text-slate-800 text-sm">Clear All Fingerprints</div>
+              <div class="text-xs text-slate-500">Wipe sensor + reset every enrollment</div>
+            </div>
+            <i class="fas fa-arrow-right text-slate-300 group-hover:text-red-500 transition-colors"></i>
+          </div>
         </div>
       </div>
     </div>
@@ -197,6 +208,21 @@ window.addEventListener('load', async () => {
     }
   } catch(e) {}
 });
+
+async function clearAllFingerprints() {
+  if (!confirm('This will erase every fingerprint template on the sensor and reset all enrollment records. This cannot be undone. Continue?')) return;
+  try {
+    const res = await apiCall('/fingerprint/clear-all', 'POST', {});
+    if (res.success) {
+      showToast(res.message, 'success');
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      showToast(res.message || 'Failed to clear fingerprints', 'error');
+    }
+  } catch (e) {
+    showToast('Failed to clear fingerprints', 'error');
+  }
+}
 
 async function addDepartment() {
   const name = document.getElementById('deptName').value.trim();
