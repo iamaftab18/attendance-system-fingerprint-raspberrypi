@@ -57,6 +57,7 @@
                 <th class="text-left px-5 py-4 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden sm:table-cell">Year</th>
                 <th class="text-left px-5 py-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Fingerprint</th>
                 <th class="text-left px-5 py-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Face</th>
+                <th class="text-left px-5 py-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Attendance</th>
                 <th class="text-left px-5 py-4 font-semibold text-slate-600 text-xs uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
@@ -99,6 +100,15 @@
                   {% endif %}
                 </td>
                 <td class="px-5 py-4">
+                  {% if student.attendance_percentage is none %}
+                    <span class="badge badge-gray">No data</span>
+                  {% elif student.attendance_percentage < attendance_threshold %}
+                    <span class="badge badge-red">{{ student.attendance_percentage }}%</span>
+                  {% else %}
+                    <span class="badge badge-green">{{ student.attendance_percentage }}%</span>
+                  {% endif %}
+                </td>
+                <td class="px-5 py-4">
                   <div class="flex items-center gap-2">
                     <button onclick="openFpEnrollModal('student', {{ student.id }})"
                       class="w-8 h-8 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 flex items-center justify-center transition-colors" title="Enroll Fingerprint">
@@ -117,7 +127,7 @@
               </tr>
               {% else %}
               <tr>
-                <td colspan="8" class="px-5 py-16 text-center text-slate-400">
+                <td colspan="9" class="px-5 py-16 text-center text-slate-400">
                   <i class="fas fa-user-graduate text-4xl mb-3 block opacity-30"></i>
                   No students added yet.
                 </td>
@@ -168,6 +178,11 @@
             <option value="4">Year 4 (BE)</option>
           </select>
         </div>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Parent's Email</label>
+        <input id="sParentEmail" type="email" placeholder="parent@example.com" class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400">
+        <p class="text-xs text-slate-400 mt-1">Used to notify parents if attendance drops below {{ attendance_threshold }}%.</p>
       </div>
       <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-xs">
         <i class="fas fa-info-circle mr-1"></i> After adding student, enroll their fingerprint and face using the buttons in the table.
@@ -251,7 +266,8 @@ async function addStudent() {
     name: document.getElementById('sName').value.trim(),
     prn: document.getElementById('sPrn').value.trim(),
     department_id: document.getElementById('sDept').value,
-    year: document.getElementById('sYear').value
+    year: document.getElementById('sYear').value,
+    parent_email: document.getElementById('sParentEmail').value.trim()
   };
   if (!body.name || !body.prn || !body.department_id) { showToast('Fill all required fields', 'error'); return; }
   const res = await apiCall('/admin/students/add', 'POST', body);

@@ -1,9 +1,11 @@
 import os
 
+from dotenv import load_dotenv
 from flask import Flask, redirect, send_from_directory, url_for
 
-from extensions import db
+from extensions import db, mail
 
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'attendance-secret-key-2024')
@@ -12,8 +14,17 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'captured_faces')
 app.config['ATTENDANCE_FOLDER'] = os.path.join(os.path.dirname(__file__), 'attendance_records')
 
-# Bind the shared SQLAlchemy extension to this Flask app.
+# SMTP (Gmail) config for parent attendance-alert emails. Values come from .env.
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'True') == 'True'
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', os.environ.get('MAIL_USERNAME'))
+
+# Bind the shared extensions to this Flask app.
 db.init_app(app)
+mail.init_app(app)
 
 # Ensure folders exist before routes try to save faces or attendance files.
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -50,9 +61,14 @@ def attendance_file(filename):
 
 if __name__ == '__main__':
     from models import create_tables
+    from utils.scheduler import start_attendance_scheduler
 
     with app.app_context():
         create_tables()
+
+    # Daily background job: emails parents of students whose trailing
+    # attendance has dropped below the threshold (see utils/attendance_utils.py).
+    start_attendance_scheduler(app)
 
     # threaded=True is required: the camera preview endpoint holds a long-lived
     # streaming connection open, and without it that would block every other

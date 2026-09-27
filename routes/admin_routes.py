@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for
 from extensions import db
 from models import Teacher, Student, Department
+from utils.attendance_utils import calculate_attendance, run_low_attendance_check, ATTENDANCE_THRESHOLD
 import secrets
 
 admin_bp = Blueprint('admin', __name__)
@@ -16,17 +17,45 @@ def admin_required(f):
     return decorated
 
 
+def _students_with_attendance():
+    students = []
+    for s in Student.query.all():
+        d = s.to_dict()
+        d['attendance_percentage'] = calculate_attendance(s)[0]
+        students.append(d)
+    return students
+
+
+def _attendance_stats(students_data):
+    percentages = [s['attendance_percentage'] for s in students_data if s['attendance_percentage'] is not None]
+    avg = round(sum(percentages) / len(percentages), 1) if percentages else None
+    at_risk = sum(1 for p in percentages if p < ATTENDANCE_THRESHOLD)
+    return avg, at_risk
+
+
 @admin_bp.route('/dashboard')
 @admin_required
 def dashboard():
     teachers = Teacher.query.count()
-    students = Student.query.count()
     departments = Department.query.all()
+    students_data = _students_with_attendance()
+    avg_attendance, at_risk = _attendance_stats(students_data)
     return render_template('admin/dashboard.html',
                            teacher_count=teachers,
-                           student_count=students,
+                           student_count=len(students_data),
                            departments=departments,
+                           students=students_data,
+                           avg_attendance=avg_attendance,
+                           at_risk_count=at_risk,
+                           attendance_threshold=ATTENDANCE_THRESHOLD,
                            admin_name=session.get('name', 'Admin'))
+
+
+@admin_bp.route('/attendance/check-now', methods=['POST'])
+@admin_required
+def attendance_check_now():
+    summary = run_low_attendance_check(force=True)
+    return jsonify({'success': True, 'summary': summary})
 
 
 # ── Teachers ────────────────────────────────────────────────────────────────
@@ -98,11 +127,11 @@ def update_teacher(tid):
 @admin_bp.route('/students')
 @admin_required
 def students():
-    all_students = Student.query.all()
     departments = Department.query.all()
     return render_template('admin/students.html',
-                           students=[s.to_dict() for s in all_students],
+                           students=_students_with_attendance(),
                            departments=departments,
+                           attendance_threshold=ATTENDANCE_THRESHOLD,
                            admin_name=session.get('name', 'Admin'))
 
 
@@ -118,7 +147,8 @@ def add_student():
             name=data['name'],
             prn=data['prn'],
             department_id=int(data['department_id']),
-            year=int(data.get('year', 1))
+            year=int(data.get('year', 1)),
+            parent_email=(data.get('parent_email') or '').strip() or None
         )
         db.session.add(student)
         db.session.commit()
@@ -150,6 +180,8 @@ def update_student(sid):
         student.prn = data.get('prn', student.prn)
         student.department_id = int(data.get('department_id', student.department_id))
         student.year = int(data.get('year', student.year))
+        if 'parent_email' in data:
+            student.parent_email = (data.get('parent_email') or '').strip() or None
         db.session.commit()
         return jsonify({'success': True, 'message': 'Student updated'})
     except Exception as e:

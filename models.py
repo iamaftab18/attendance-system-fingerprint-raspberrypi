@@ -70,6 +70,8 @@ class Student(db.Model):
     fingerprint_id = db.Column(db.Integer, unique=True, nullable=True)
     fingerprint_enrolled = db.Column(db.Boolean, default=False)
     face_enrolled = db.Column(db.Boolean, default=False)
+    parent_email = db.Column(db.String(120), nullable=True)
+    last_attendance_check = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     attendance_records = db.relationship('AttendanceRecord', backref='student', lazy=True)
 
@@ -82,7 +84,8 @@ class Student(db.Model):
             'department': self.dept.name if self.dept else '',
             'year': self.year,
             'fingerprint_enrolled': self.fingerprint_enrolled,
-            'face_enrolled': self.face_enrolled
+            'face_enrolled': self.face_enrolled,
+            'parent_email': self.parent_email
         }
 
 
@@ -148,6 +151,12 @@ def _ensure_columns():
     student_columns = [c['name'] for c in inspector.get_columns('students')]
     if 'face_enrolled' not in student_columns:
         db.session.execute(db.text('ALTER TABLE students ADD COLUMN face_enrolled BOOLEAN DEFAULT 0'))
+        db.session.commit()
+    if 'parent_email' not in student_columns:
+        db.session.execute(db.text('ALTER TABLE students ADD COLUMN parent_email VARCHAR(120)'))
+        db.session.commit()
+    if 'last_attendance_check' not in student_columns:
+        db.session.execute(db.text('ALTER TABLE students ADD COLUMN last_attendance_check DATETIME'))
         db.session.commit()
 
 

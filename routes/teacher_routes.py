@@ -1,9 +1,26 @@
-from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for
+import threading
+
+from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, current_app
 from extensions import db
 from models import Teacher, Student, Department, Lecture, AttendanceRecord
+from utils.attendance_utils import calculate_attendance, send_absence_notifications, ATTENDANCE_THRESHOLD
 from datetime import datetime, date, timedelta
 
 teacher_bp = Blueprint('teacher', __name__)
+
+
+def _notify_absent_students_async(lecture_id):
+    """Send absence emails off the request thread so ending a lecture isn't
+    slowed down by SMTP round-trips to each absent student's parent."""
+    app = current_app._get_current_object()
+
+    def run():
+        with app.app_context():
+            lecture = Lecture.query.get(lecture_id)
+            if lecture:
+                send_absence_notifications(lecture)
+
+    threading.Thread(target=run, daemon=True).start()
 
 
 def teacher_required(f):
@@ -72,12 +89,24 @@ def dashboard():
     active_lecture = Lecture.query.filter_by(teacher_id=teacher.id, status='active').first()
     departments = Department.query.all()
     students = Student.query.order_by(Student.name.asc()).all()
+    students_data = []
+    percentages = []
+    for s in students:
+        d = s.to_dict()
+        pct, _, _ = calculate_attendance(s)
+        d['attendance_percentage'] = pct
+        students_data.append(d)
+        if pct is not None:
+            percentages.append(pct)
+    avg_attendance = round(sum(percentages) / len(percentages), 1) if percentages else None
     return render_template('teacher/dashboard.html',
                            teacher=teacher,
                            lectures=[l.to_dict() for l in lectures],
                            active_lecture=active_lecture.to_dict() if active_lecture else None,
                            departments=departments,
-                           students=[s.to_dict() for s in students])
+                           students=students_data,
+                           avg_attendance=avg_attendance,
+                           attendance_threshold=ATTENDANCE_THRESHOLD)
 
 
 @teacher_bp.route('/lectures/create', methods=['POST'])
@@ -143,6 +172,8 @@ def complete_lecture(lid):
     excel_path = finalize_lecture_excel(lecture)
     lecture.excel_path = excel_path
     db.session.commit()
+
+    _notify_absent_students_async(lecture.id)
 
     return jsonify({'success': True, 'message': 'Lecture completed and attendance saved!'})
 
@@ -222,7 +253,8 @@ def add_student():
             name=data['name'],
             prn=data['prn'],
             department_id=int(data['department_id']),
-            year=int(data.get('year', 1))
+            year=int(data.get('year', 1)),
+            parent_email=(data.get('parent_email') or '').strip() or None
         )
         db.session.add(student)
         db.session.commit()

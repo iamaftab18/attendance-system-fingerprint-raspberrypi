@@ -32,7 +32,7 @@
     <div class="flex-1 p-6 space-y-6">
 
       <!-- Stats row -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <div class="stat-card card-hover">
           <div class="flex items-center justify-between mb-3">
             <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
@@ -75,6 +75,21 @@
           </div>
           <div class="text-3xl font-display font-bold text-slate-800" id="sensorTemplateCount">–</div>
           <div class="text-sm text-slate-500 mt-1">FP Templates</div>
+        </div>
+
+        <div class="stat-card card-hover">
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+              <i class="fas fa-chart-pie text-red-500 text-lg"></i>
+            </div>
+            {% if at_risk_count %}
+            <span class="badge badge-red">{{ at_risk_count }} at risk</span>
+            {% else %}
+            <span class="badge badge-green">All good</span>
+            {% endif %}
+          </div>
+          <div class="text-3xl font-display font-bold text-slate-800">{{ avg_attendance if avg_attendance is not none else '–' }}{{ '%' if avg_attendance is not none }}</div>
+          <div class="text-sm text-slate-500 mt-1">Avg Attendance</div>
         </div>
       </div>
 
@@ -153,6 +168,68 @@
             </div>
             <i class="fas fa-arrow-right text-slate-300 group-hover:text-red-500 transition-colors"></i>
           </div>
+
+          <div onclick="runAttendanceCheck()" class="flex items-center gap-4 p-4 rounded-xl bg-purple-50 border border-purple-100 hover:border-purple-300 card-hover group cursor-pointer">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow">
+              <i class="fas fa-envelope text-white"></i>
+            </div>
+            <div class="flex-1">
+              <div class="font-semibold text-slate-800 text-sm">Run Attendance Check Now</div>
+              <div class="text-xs text-slate-500">Email parents of students below {{ attendance_threshold }}%</div>
+            </div>
+            <i class="fas fa-arrow-right text-slate-300 group-hover:text-purple-500 transition-colors"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Attendance Watchlist -->
+      <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div class="p-5 border-b border-slate-50 flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h2 class="font-display font-bold text-slate-800">Student Attendance</h2>
+            <p class="text-xs text-slate-400">Filter to see students below the {{ attendance_threshold }}% threshold</p>
+          </div>
+          <select id="attendanceFilter" onchange="filterAttendanceTable()" class="border border-slate-200 rounded-lg text-sm px-3 py-2 text-slate-600 outline-none focus:ring-2 focus:ring-primary-400 bg-white">
+            <option value="">All Students</option>
+            <option value="below">Below {{ attendance_threshold }}%</option>
+          </select>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-100">
+                <th class="text-left px-5 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide">Student</th>
+                <th class="text-left px-5 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden md:table-cell">PRN</th>
+                <th class="text-left px-5 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden lg:table-cell">Department</th>
+                <th class="text-left px-5 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden sm:table-cell">Year</th>
+                <th class="text-left px-5 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide">Attendance</th>
+              </tr>
+            </thead>
+            <tbody id="attendanceTable">
+              {% for student in students %}
+              <tr class="table-row-hover border-b border-slate-50" data-pct="{{ student.attendance_percentage if student.attendance_percentage is not none else '' }}">
+                <td class="px-5 py-3 font-medium text-slate-800">{{ student.name }}</td>
+                <td class="px-5 py-3 font-mono text-xs text-slate-600 hidden md:table-cell">{{ student.prn }}</td>
+                <td class="px-5 py-3 hidden lg:table-cell"><span class="badge badge-blue">{{ student.department }}</span></td>
+                <td class="px-5 py-3 hidden sm:table-cell"><span class="badge badge-gray">Year {{ student.year }}</span></td>
+                <td class="px-5 py-3">
+                  {% if student.attendance_percentage is none %}
+                    <span class="badge badge-gray">No data</span>
+                  {% elif student.attendance_percentage < attendance_threshold %}
+                    <span class="badge badge-red">{{ student.attendance_percentage }}%</span>
+                  {% else %}
+                    <span class="badge badge-green">{{ student.attendance_percentage }}%</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="5" class="px-5 py-12 text-center text-slate-400">No students added yet.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <p id="attendanceEmptyState" class="hidden px-5 py-12 text-center text-slate-400">No students match this filter.</p>
         </div>
       </div>
     </div>
@@ -222,6 +299,41 @@ async function clearAllFingerprints() {
   } catch (e) {
     showToast('Failed to clear fingerprints', 'error');
   }
+}
+
+async function runAttendanceCheck() {
+  if (!confirm('This will check every student\'s attendance over the last 30 days and email parents of anyone below {{ attendance_threshold }}%. Continue?')) return;
+  try {
+    showToast('Running attendance check...', 'info');
+    const res = await apiCall('/admin/attendance/check-now', 'POST', {});
+    if (res.success) {
+      const s = res.summary;
+      showToast(`Checked ${s.checked} students, ${s.flagged} below threshold, ${s.emailed} emails sent`, 'success');
+      if (s.errors && s.errors.length) {
+        showToast(`${s.errors.length} email(s) failed to send`, 'error');
+      }
+    } else {
+      showToast(res.message || 'Attendance check failed', 'error');
+    }
+  } catch (e) {
+    showToast('Attendance check failed', 'error');
+  }
+}
+
+const ATTENDANCE_THRESHOLD = {{ attendance_threshold }};
+
+function filterAttendanceTable() {
+  const mode = document.getElementById('attendanceFilter').value;
+  const rows = document.querySelectorAll('#attendanceTable tr[data-pct]');
+  let visible = 0;
+  rows.forEach(row => {
+    const raw = row.dataset.pct;
+    const pct = raw === '' ? null : parseFloat(raw);
+    const show = mode !== 'below' || (pct !== null && pct < ATTENDANCE_THRESHOLD);
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  document.getElementById('attendanceEmptyState').classList.toggle('hidden', rows.length === 0 || visible > 0);
 }
 
 async function addDepartment() {
